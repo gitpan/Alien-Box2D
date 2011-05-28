@@ -6,6 +6,7 @@ use base 'My::Builder';
 
 use File::Spec::Functions qw(catdir catfile rel2abs);
 use Config;
+use Alien::CMake;
 
 sub build_binaries {
   my( $self, $build_out, $build_src ) = @_;
@@ -31,8 +32,9 @@ sub build_binaries {
   # do 'cmake ...'
   my $cmd = $self->get_cmake_cmd($prefixdir);
   print "CMaking ...\n";
+  Alien::CMake->set_path;
   print "(cmd: $cmd)\n";
-  $self->do_system($cmd);# or die "###ERROR### [$?] during cmake ... ";
+  $self->do_system($cmd) or die "###ERROR### [$?] during cmake ... ";
 
   # do 'make install'
   my @cmd = ($self->get_make, 'install');
@@ -47,7 +49,7 @@ sub build_binaries {
 sub get_cmake_cmd {
   my ($self, $prefixdir) = @_;
 
-  my $cmd = sprintf('cmake -DCMAKE_INSTALL_PREFIX="%s" -DBOX2D_INSTALL=ON -DBOX2D_BUILD_SHARED=ON ..',
+  my $cmd = sprintf('cmake -DCMAKE_INSTALL_PREFIX="%s" -DBOX2D_INSTALL=ON -DBOX2D_BUILD_SHARED=ON -DBOX2D_BUILD_EXAMPLES=OFF ..',
     $self->config_data('build_prefix'));
 
   return $cmd;

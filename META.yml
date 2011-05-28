@@ -3,6 +3,7 @@ abstract: 'Build and make available Box2D library - L<http://box2d.org/>'
 author:
   - 'KMX <kmx@cpan.org>'
 build_requires:
+  Alien::CMake: 0.03
   Archive::Extract: 0
   Archive::Tar: 0
   Archive::Zip: 0
@@ -15,6 +16,7 @@ build_requires:
   File::Spec: 0
   Module::Build: 0.36
 configure_requires:
+  Alien::CMake: 0.03
   Archive::Extract: 0
   Digest::SHA: 0
   File::Copy: 0
@@ -32,7 +34,7 @@ name: Alien-Box2D
 provides:
   Alien::Box2D:
     file: lib/Alien/Box2D.pm
-    version: 0.101
+    version: 0.102
 requires:
   File::ShareDir: 1.00
   File::Spec: 0
@@ -40,4 +42,4 @@ resources:
   bugtracker: http://rt.cpan.org/NoAuth/Bugs.html?Dist=Alien-Box2D
   license: http://dev.perl.org/licenses/
   repository: http://github.com/PerlGameDev/Alien-Box2D
-version: 0.101
+version: 0.102
