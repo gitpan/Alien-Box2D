@@ -5,15 +5,15 @@ use warnings;
 use base 'Module::Build';
 
 use lib "inc";
-use My::Utility qw(find_Box2D_dir find_file sed_inplace get_dlext);
 use File::Spec::Functions qw(catdir catfile splitpath catpath rel2abs abs2rel);
-use File::Path qw(make_path remove_tree);
+use File::Path;
 use File::Copy qw(cp);
 use File::Fetch;
 use File::Find;
 use File::ShareDir;
 use Archive::Extract;
 use Digest::SHA qw(sha1_hex);
+use Text::Patch;
 use Config;
 
 sub ACTION_build {
@@ -25,75 +25,64 @@ sub ACTION_build {
   $self->SUPER::ACTION_build;
 }
 
+sub ACTION_install {
+  my $self = shift;
+  my $sharedir = eval {File::ShareDir::dist_dir('Alien-Box2D')};  
+  $self->clean_dir($sharedir) if $sharedir; # remove previous versions
+  return $self->SUPER::ACTION_install(@_);
+}
+
 sub ACTION_code {
   my $self = shift;
 
   my $bp = $self->notes('build_params');
   die "###ERROR### Cannot continue build_params not defined" unless defined($bp);
 
-  # we are deriving the subdir name from $bp->{title} as we want to
-  # prevent troubles when user reinstalls the same version of
-  # Alien::Box2D with different build options
-  my $share_subdir = $self->{properties}->{dist_version} . '_' . substr(sha1_hex($bp->{title}), 0, 8);
+  # we are deriving the subdir name from VERSION as we want to prevent
+  # troubles when user reinstalls the newer version of Alien::Tidyp
+  my $share_subdir = $self->{properties}->{dist_version};
+  my $build_out = catfile('sharedir', $share_subdir);
 
   # check marker
   if (! $self->check_build_done_marker) {
 
     # important directories
     my $download     = 'download';
-    my $patches      = 'patches';
-    my $build_out    = catfile('sharedir', $share_subdir);
     my $build_src    = 'build_src';
     $self->add_to_cleanup($build_src, $build_out);
 
     # save some data into future Alien::Box2D::ConfigData
     $self->config_data('build_prefix', $build_out);
     $self->config_data('build_params', $bp);
-    $self->config_data('build_cc', $Config{cc});
-    $self->config_data('build_arch', $Config{archname});
-    $self->config_data('build_os', $^O);
-    $self->config_data('script', '');            # just to be sure
-    $self->config_data('config', {});            # just to be sure
+    $self->config_data('config', {}); # just to be sure
 
-    if($bp->{buildtype} eq 'use_config_script') {
-      $self->config_data('script', $bp->{script});
-    }
-    elsif($bp->{buildtype} eq 'use_prebuilt_binaries') {
-      # all the following functions die on error, no need to test ret values
-      $self->fetch_binaries($download);
-      $self->clean_dir($build_out);
-      $self->extract_binaries($download, $build_out);
-      $self->set_config_data($build_out);
-    }
-    elsif($bp->{buildtype} eq 'build_from_sources' ) {
-      # all the following functions die on error, no need to test ret values
-      $self->fetch_sources($download);
-      $self->extract_sources($download, $patches, $build_src);
-      $self->clean_dir($build_out);
-      $self->build_binaries($build_out, $build_src);
-      $self->set_config_data($build_out);
-    }
+    $self->fetch_sources($download);
+    $self->extract_sources($download, $build_src);    
+    $self->clean_dir($build_out);
+    $self->build_binaries($build_out, $build_src);
+    $self->set_config_data($build_out);
 
     # mark sucessfully finished build
     $self->touch_build_done_marker;
   }
   
-  if($^O eq 'darwin') {
-    my $sharedir     = eval {File::ShareDir::dist_dir('Alien-Box2D')} || '';
-    my $dlext        = get_dlext();
-    my ($libname)    = find_file("sharedir/$share_subdir/lib", qr/\.$dlext[\d\.]+$/);
-    if($self->invoked_action() eq 'test') {
-      my $cmd = "install_name_tool -id $libname $libname";
-      print "Changing lib id ...\n(cmd: $cmd)\n";
-      $self->do_system($cmd);
-    }
-    elsif($self->invoked_action() eq 'install') {
-      $libname         = $1 if $libname =~ /([^\\\/]+)$/;
-      my $cmd = "install_name_tool -id $sharedir/$share_subdir/lib/$libname sharedir/$share_subdir/lib/$libname";
-      print "Changing lib id ...\n(cmd: $cmd)\n";
-      $self->do_system($cmd);
-    }
-  }
+  #### as we are building just a static library the following is not (perhaps) necessary
+  #if($^O eq 'darwin') {
+  #  my $sharedir     = eval {File::ShareDir::dist_dir('Alien-Box2D')} || '';
+  #  my $dlext        = 'so|dylib|bundle';
+  #  my ($libname)    = $self->find_file("$build_out/lib", qr/\.$dlext[\d\.]+$/);
+  #  if($self->invoked_action() eq 'test') {
+  #    my $cmd = "install_name_tool -id $libname $libname";
+  #    print "Changing lib id ...\n(cmd: $cmd)\n";
+  #    $self->do_system($cmd);
+  #  }
+  #  elsif($self->invoked_action() eq 'install') {
+  #    $libname         = $1 if $libname =~ /([^\\\/]+)$/;
+  #    my $cmd = "install_name_tool -id $sharedir/$share_subdir/lib/$libname sharedir/$share_subdir/lib/$libname";
+  #    print "Changing lib id ...\n(cmd: $cmd)\n";
+  #    $self->do_system($cmd);
+  #  }
+  #}
 
   $self->SUPER::ACTION_code;
 }
@@ -120,31 +109,14 @@ sub fetch_file {
   die "###ERROR### _fetch_file failed '$fn'";
 }
 
-sub fetch_binaries {
-  my ($self, $download) = @_;
-  my $bp = $self->notes('build_params');
-  $self->fetch_file($bp->{url}, $bp->{sha1sum}, $download);
-}
-
 sub fetch_sources {
   my ($self, $download) = @_;
   my $bp = $self->notes('build_params');
   $self->fetch_file($bp->{url}, $bp->{sha1sum}, $download);
 }
 
-sub extract_binaries {
-  my ($self, $download, $build_out) = @_;
-
-  # do extract binaries
-  my $bp = $self->notes('build_params');
-  my $archive = catfile($download, File::Fetch->new(uri => $bp->{url})->file);
-  print "Extracting $archive...\n";
-  my $ae = Archive::Extract->new( archive => $archive );
-  die "###ERROR###: Cannot extract $archive ", $ae->error unless $ae->extract(to => $build_out);
-}
-
 sub extract_sources {
-  my ($self, $download, $patches, $build_src) = @_;
+  my ($self, $download, $build_src) = @_;
   my $bp = $self->notes('build_params');
 
   my $srcdir = catfile($build_src, $bp->{dirname});
@@ -156,16 +128,7 @@ sub extract_sources {
     print "Extracting sources...\n";
     my $ae = Archive::Extract->new( archive => $archive );
     die "###ERROR###: cannot extract $bp ", $ae->error unless $ae->extract(to => $build_src);
-    foreach my $i (@{$bp->{patches}}) {
-      chdir $srcdir;
-      print "Applying patch '$i'\n";
-      my $cmd = $self->patch_command($srcdir, catfile($patches, $i));
-      if ($cmd) {
-        print "(cmd: $cmd)\n";
-        $self->do_system($cmd) or die "###ERROR### [$?] during patch ... ";
-      }
-      chdir $self->base_dir();
-    }
+    $self->apply_patch($build_src, $_) foreach (@{$bp->{patches}});
   }
   return 1;
 }
@@ -174,26 +137,21 @@ sub set_config_data {
   my( $self, $build_out ) = @_;
 
   # try to find Box2D root dir
-  my ($prefix, $incdir, $libdir) = find_Box2D_dir(rel2abs($build_out));
-  die "###ERROR### Cannot find Box2D directory in 'sharedir'" unless $prefix;
-  $self->config_data('share_subdir', abs2rel($prefix, rel2abs('sharedir')));
+  my $prefix = rel2abs($build_out);
+  $self->config_data('share_subdir', $self->{properties}->{dist_version});
 
   # set defaults
   my $cfg = {
     # defaults (used on MS Windows build)
     version     => $self->notes('build_box2d_version'),
     prefix      => '@PrEfIx@',
-    libs        => '-L' . $self->get_path('@PrEfIx@/lib') . ' -lBox2D',
-    cflags      => '-I' . $self->get_path('@PrEfIx@/include'),
+    libs        => '-L' . $self->quote_literal('@PrEfIx@/lib') . ' -lBox2D',
+    cflags      => '-I' . $self->quote_literal('@PrEfIx@/include'),
     shared_libs => [ ],
   };
   
   if($^O =~ /(bsd|linux)/) {
-    $cfg->{libs} = '-L' . $self->get_path('@PrEfIx@/lib') . ' -Wl,-rpath,' . $self->get_path('@PrEfIx@/lib') . ' -lBox2D -lm',
-  }
-
-  if($self->config_data('build_params')->{version}) {
-    $cfg->{version} = $self->config_data('build_params')->{version};
+    $cfg->{libs} = '-L' . $self->quote_literal('@PrEfIx@/lib') . ' -Wl,-rpath,' . $self->quote_literal('@PrEfIx@/lib') . ' -lBox2D -lm',
   }
 
   # write config
@@ -201,22 +159,49 @@ sub set_config_data {
 }
 
 sub build_binaries {
-  # this needs to be overriden in My::Builder::<platform>
-  my ($self, $build_out, $build_src) = @_;
-  die "###ERROR### My::Builder cannot build Box2D from sources, use rather My::Builder::<platform>";
-}
+  my( $self, $build_out, $build_src ) = @_;
+  my $bp = $self->notes('build_params');
 
-sub get_path {
-  # this needs to be overriden in My::Builder::<platform>
-  my ( $self, $path ) = @_;
-  return $path;
+  print "BUILDING '" . $bp->{dirname} . "'...\n";
+  my $srcdir = catfile($build_src, $bp->{dirname});
+  my $prefixdir = rel2abs($build_out);  
+  $self->config_data('build_prefix', $prefixdir); # save it for future Alien::Box2D::ConfigData
+  
+  # some platform specific stuff
+  my $makefile = $^O eq 'MSWin32' ? rel2abs('patches/Makefile.mingw') : rel2abs('patches/Makefile.unix'); 
+  my $cxxflags = '-O3';
+  $cxxflags .= ' -fPIC' if $Config{cccdlflags} =~ /-fPIC/;
+  # MacOSX related flags
+  $cxxflags .= ' -arch x86_64' if $Config{ccflags} =~ /-arch x86_64/;
+  $cxxflags .= ' -arch i386' if $Config{ccflags} =~ /-arch i386/;
+  $cxxflags .= ' -arch ppc' if $Config{ccflags} =~ /-arch ppc/;
+
+  print "Gonna read version info from $srcdir/Common/b2Settings.cpp\n";
+  open(DAT, "$srcdir/Common/b2Settings.cpp") || die;
+  my @raw=<DAT>;
+  close(DAT);
+  my ($version) = grep(/version\s?=\s?\{[\d\s,]+\}/, @raw);
+  if ($version =~ /version\s?=\s?\{(\d+)[^\d]+(\d+)[^\d]+(\d+)\}/) {
+    print STDERR "Got version=$1.$2.$3\n";
+    $self->notes('build_box2d_version', "$1.$2.$3");
+  }
+  
+  chdir $srcdir;
+  my @cmd = ($Config{make}, '-f', $makefile, "PREFIX=$prefixdir", 'install');
+  push @cmd, "CXXFLAGS=$cxxflags" if $cxxflags;
+  #push @cmd, "CXX=g++"; ### the default in makefile.unix is 'c++' - here you can override it
+  printf("(cmd: %s)\n", join(' ', @cmd));
+  $self->do_system(@cmd) or die "###ERROR### [$?] during make ... ";
+  chdir $self->base_dir();
+  
+  return 1;
 }
 
 sub clean_dir {
   my( $self, $dir ) = @_;
   if (-d $dir) {
-    remove_tree($dir);
-    make_path($dir);
+    File::Path::rmtree($dir);
+    File::Path::mkpath($dir);
   }
 }
 
@@ -239,7 +224,7 @@ sub clean_build_done_marker {
 }
 
 sub check_sha1sum {
-  my( $self, $file, $sha1sum ) = @_;
+  my ($self, $file, $sha1sum) = @_;
   my $sha1 = Digest::SHA->new;
   my $fh;
   open($fh, $file) or die "###ERROR## Cannot check checksum for '$file'\n";
@@ -249,21 +234,60 @@ sub check_sha1sum {
   return ($sha1->hexdigest eq $sha1sum) ? 1 : 0
 }
 
-sub patch_command {
-  my( $self, $base_dir, $patch_file ) = @_;
-  
-  print("patch_command: $base_dir, $patch_file\n");
-  
-  my $devnull = File::Spec->devnull();
-  my $patch_rv = system("patch -v > $devnull 2>&1");
-  if ($patch_rv == 0) {
-    $patch_file = File::Spec->abs2rel( $patch_file, $base_dir );
-    # the patches are expected with UNIX newlines
-    # the following command works on both UNIX+Windows
-	return qq("$^X" -pe0 -- "$patch_file" | patch -p1); # paths of files to patch should be relative to build_src
+sub find_file {
+  my ($self, $dir, $re) = @_;
+  my @files;
+  $re ||= qr/.*/;
+  find({ wanted => sub { push @files, rel2abs($_) if /$re/ }, follow => 1, no_chdir => 1 , follow_skip => 2}, $dir);
+  return @files;
+}
+
+sub quote_literal {
+    my ($self, $txt) = @_;
+    if ($^O eq 'MSWin32') {
+      $txt =~ s|"|\\"|g;
+      return qq("$txt");
+    }
+    return $txt;    
+}
+
+# pure perl implementation of patch functionality
+sub apply_patch {
+  my ($self, $dir_to_be_patched, $patch_file) = @_;
+  my ($src, $diff);
+
+  undef local $/;
+  open(DAT, $patch_file) or die "###ERROR### Cannot open file: '$patch_file'\n";
+  $diff = <DAT>;
+  close(DAT);
+  $diff =~ s/\r\n/\n/g; #normalise newlines
+  $diff =~ s/\ndiff /\nSpLiTmArKeRdiff /g;
+  my @patches = split('SpLiTmArKeR', $diff);
+
+  print STDERR "Applying patch file: '$patch_file'\n";
+  foreach my $p (@patches) {
+    my ($k) = map{$_ =~ /\n---\s*([\S]+)/} $p;
+    # doing the same like -p1 for 'patch'
+    $k =~ s|\\|/|g;
+    $k =~ s|^[^/]*/(.*)$|$1|;
+    $k = catfile($dir_to_be_patched, $k);
+    print STDERR "- gonna patch '$k'\n" if $self->notes('build_debug_info');
+
+    open(SRC, $k) or die "###ERROR### Cannot open file: '$k'\n";
+    $src  = <SRC>;
+    close(SRC);
+    $src =~ s/\r\n/\n/g; #normalise newlines
+
+    my $out = eval { Text::Patch::patch( $src, $p, { STYLE => "Unified" } ) };
+    if ($out) {
+      open(OUT, ">", $k) or die "###ERROR### Cannot open file for writing: '$k'\n";
+      print(OUT $out);
+      close(OUT);
+    }
+    else {
+      warn "###WARN### Patching '$k' failed: $@";
+    }
   }
-  warn "###WARN### patch not available";
-  return '';
 }
 
 1;
