@@ -13,27 +13,17 @@ Alien::Box2D - Build and make available Box2D library - L<http://box2d.org/>
 
 =head1 VERSION
 
-Version 0.102_3
+Version 0.102_4
 
 =cut
 
-our $VERSION = '0.102_3';
+our $VERSION = '0.102_4';
 $VERSION = eval $VERSION;
 
 =head1 SYNOPSIS
 
-Alien::Box2D during its installation does one of the following:
-
-=over
-
-=item * Builds I<Box2D> binaries from source codes and installs dev 
-files (headers: *.h, static library: *.a) into I<share>
-directory of Alien::Box2D distribution.
-
-=back
-
-Later you can use Alien::Box2D in your module that needs to link with I<libBox2D>
-like this:
+You can use Alien::Box2D in your module that needs to link with I<Box2D>
+library like this:
 
     # Sample Build.pl
     use Module::Build;
@@ -58,9 +48,10 @@ NOTE: Alien::Box2D is required only for building not for using 'Any::Box2D::Modu
 
 =head1 DESCRIPTION
 
-In short C<Alien::Box2D> can be used to detect and get configuration
-settings from an already installed Box2D. It offers also an option to
-download Box2D source codes and build binaries from scratch.
+Alien::Box2D during its installation downloads Box2D library source codes,
+builds I<Box2D> binaries from source codes and installs necessary dev files
+(headers: *.h, static library: *.a) into I<share> directory of Alien::Box2D
+distribution.
 
 =head1 METHODS
 
@@ -79,15 +70,41 @@ Please post issues and bugs at L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Alien-
 
 =head1 AUTHOR
 
+FROGGS, E<lt>froggs at cpan.orgE<gt>
+
 KMX, E<lt>kmx at cpan.orgE<gt>
 
 =head1 COPYRIGHT
+
+Please notice that the source code of tidyp library has a different license than module itself.
+
+=head2 Alien::Box2D perl module
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 The full text of the license can be found in the
 LICENSE file included with this module.
+
+=head2 Source code of Box2D library
+
+Copyright (c) 2006-2010 Erin Catto http://www.gphysics.com
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+claim that you wrote the original software. If you use this software
+in a product, an acknowledgment in the product documentation would be
+appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 
 =cut
 
