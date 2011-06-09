@@ -4,7 +4,10 @@ inc/My/Builder.pm
 lib/Alien/Box2D.pm
 LICENSE
 MANIFEST			This list of files
+META.yml
+MYMETA.json
 patches/Makefile.mingw
+patches/Makefile.nmake
 patches/Makefile.unix
 patches/mingw-minmax.diff
 README
@@ -13,4 +16,3 @@ t/002_config.t
 t/003_compile.t
 t/test1.c
 TODO
-META.yml

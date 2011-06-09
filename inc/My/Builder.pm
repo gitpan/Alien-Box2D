@@ -150,7 +150,9 @@ sub build_binaries {
   $self->config_data('build_prefix', $prefixdir); # save it for future Alien::Box2D::ConfigData
   
   # some platform specific stuff
-  my $makefile = $^O eq 'MSWin32' ? rel2abs('patches/Makefile.mingw') : rel2abs('patches/Makefile.unix'); 
+  my $makefile = rel2abs('patches/Makefile.unix'); 
+  $makefile = rel2abs('patches/Makefile.mingw') if $^O eq 'MSWin32' && $Config{cc} =~ /gcc/;
+  $makefile = rel2abs('patches/Makefile.nmake') if $^O eq 'MSWin32' && $Config{cc} =~ /cl/;
   my $cxxflags = '-O3';
   $cxxflags .= ' -fPIC' if $Config{cccdlflags} =~ /-fPIC/;
   # MacOSX related flags
@@ -163,15 +165,16 @@ sub build_binaries {
     }
   }
 
+  my $cxx = $self->search_env_path(qw/c++ g++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC/); #search PATH for c++ compiler  
+  my $ar = $self->search_env_path('ar');
+  my $ranlib = $self->search_env_path('ranlib');
   ### workaround for http://www.cpantesters.org/cpan/report/16e1fb62-8bc3-11e0-a7f7-6524785ebe45
-  #On solaris, some tools like 'ar' are not in the default PATH, but in /usr/???/bin
-  my $ar;
-  if ($^O eq 'solaris' && system('ar -V') < 0) {    
+  #On solaris, some tools like 'ar' are not in the default PATH, but in /usr/???/bin  
+  if ($^O eq 'solaris') {    
     for (qw[/usr/ccs/bin /usr/xpg4/bin /usr/sfw/bin /usr/xpg6/bin /usr/gnu/bin /opt/gnu/bin /usr/bin]) {
-      if (-x "$_/ar") {
-        $ar = "$_/ar";
-        last;
-      }
+      last if $ar && $ranlib;
+      $ar = "$_/ar" if (!$ar && -x "$_/ar");
+      $ranlib = "$_/ranlib" if (!$ranlib && -x "$_/ranlib");
     }
   }
 
@@ -183,14 +186,16 @@ sub build_binaries {
   if ($version =~ /version\s?=\s?\{(\d+)[^\d]+(\d+)[^\d]+(\d+)\}/) {
     print STDERR "Got version=$1.$2.$3\n";
     $self->notes('build_box2d_version', "$1.$2.$3");
-  }
-  
+  } 
+   
   chdir $srcdir;
   my @cmd = ($self->_get_make, '-f', $makefile, "PREFIX=$prefixdir", 'install');
   push @cmd, "CXXFLAGS=$cxxflags" if $cxxflags;
   push @cmd, "AR=$ar" if $ar;
-  #push @cmd, "CXX=g++"; ### the default in makefile.unix is 'c++' - here you can override it
+  push @cmd, "RANLIB=$ranlib" if $ranlib;
+  push @cmd, "CXX=$cxx" if $cxx;
   printf("(cmd: %s)\n", join(' ', @cmd));
+  $self->config_data('make_command', \@cmd);
   $self->do_system(@cmd) or die "###ERROR### [$?] during make ... ";
   chdir $self->base_dir();
   
@@ -320,6 +325,17 @@ sub _is_gnu_make {
     return 1;
   }
   return 0;
+}
+
+sub search_env_path {
+  my $self = shift;
+  my $sep = $Config{path_sep};
+  my $ext = $Config{exe_ext};
+  for my $exe (@_) {
+    for my $dir (split /\Q$sep\E/,$ENV{PATH}) {
+      return $exe if -x "$dir/$exe$ext";
+    }
+  }  
 }
 
 1;

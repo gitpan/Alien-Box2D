@@ -13,11 +13,11 @@ Alien::Box2D - Build and make available Box2D library - L<http://box2d.org/>
 
 =head1 VERSION
 
-Version 0.102_4
+Version 0.102_5
 
 =cut
 
-our $VERSION = '0.102_4';
+our $VERSION = '0.102_5';
 $VERSION = eval $VERSION;
 
 =head1 SYNOPSIS
@@ -76,7 +76,7 @@ KMX, E<lt>kmx at cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Please notice that the source code of tidyp library has a different license than module itself.
+Please notice that the source code of Box2D library has a different license than module itself.
 
 =head2 Alien::Box2D perl module
 
