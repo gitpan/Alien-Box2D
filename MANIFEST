@@ -5,7 +5,6 @@ lib/Alien/Box2D.pm
 LICENSE
 MANIFEST			This list of files
 META.yml
-MYMETA.json
 patches/Makefile.mingw
 patches/Makefile.nmake
 patches/Makefile.unix
