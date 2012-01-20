@@ -55,7 +55,7 @@
    "provides" : {
       "Alien::Box2D" : {
          "file" : "lib/Alien/Box2D.pm",
-         "version" : "0.104"
+         "version" : "0.105"
       }
    },
    "release_status" : "stable",
@@ -70,5 +70,5 @@
          "url" : "http://github.com/PerlGameDev/Alien-Box2D"
       }
    },
-   "version" : "0.104"
+   "version" : "0.105"
 }
